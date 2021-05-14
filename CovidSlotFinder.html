@@ -1,0 +1,316 @@
+<html>
+<head>
+<script src="https://code.jquery.com/jquery-3.6.0.js"
+  integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk="
+  crossorigin="anonymous"></script>
+  <script> 
+	var minage=18;
+	var stateid=0;
+	var Districtid=0;	
+	var lastUpdated=new Date();
+	var todaydate=(lastUpdated.getDate()) +'-'+(lastUpdated.getMonth()+1)+'-'+lastUpdated.getFullYear();
+	var tomorrowdate=(lastUpdated.getDate()+1) +'-'+(lastUpdated.getMonth()+1)+'-'+lastUpdated.getFullYear();
+	var dayaftertomorrowdate=(lastUpdated.getDate()+2) +'-'+(lastUpdated.getMonth()+1)+'-'+lastUpdated.getFullYear();
+	
+	var rownum=1;
+	var vaccine='ALL';
+	var callAPI = setInterval(getslotsweek, 5000);
+	var alertSet=0;
+	$(document).ready(function() { 
+		$("#divMain").html('');	
+		$('#spnlstUpdt').html('Last Updated: '+lastUpdated);
+		$('#hagegroup').html('Covid Slot Update for Above '+minage);
+		$("#ddlState").html('');
+		$("#ddlDistrict").html('');
+		$("#ddlState").append($("<option></option>").val(0).html('Select State')); 
+		$("#ddlDistrict").append($("<option></option>").val(0).html('Select District'));  
+		LoadState();
+		//getslots();
+		$('#ddlState').on('change', function() {
+			alertSet=0;
+			$("#btnsetalert").html('Set Alert');
+		  stateid=this.value;
+		  LoadDistrict();
+		});
+		$('#ddlMinAge').on('change', function() {
+			alertSet=0;
+			$("#btnsetalert").html('Set Alert');
+		  minage=this.value;
+			$('#hagegroup').html('Covid Slot Update for Above '+minage);		  
+		});
+		$('#ddlDistrict').on('change', function() {
+			alertSet=0;
+			$("#btnsetalert").html('Set Alert');
+		  Districtid=this.value;		 
+		});
+		$('#ddlVaccine').on('change', function() {
+		alertSet=0;	
+		$("#btnsetalert").html('Set Alert');
+		  vaccine=this.value;		 
+		});
+		$('#btnsetalert').on('click', function() {
+			console.log(stateid);
+			console.log(Districtid);
+			console.log(minage);
+			console.log(alertSet);
+			if(alertSet==1)
+			{
+				alertSet=0;
+				$("#btnsetalert").html('Set Alert');
+			}
+		  else if(stateid>0 && Districtid>0 && minage>17)
+		  {
+			  $("#btnsetalert").html('Reset');
+			  alertSet=1;
+			  //getslots();
+			  getslotsweek();
+		  }
+		  else
+		  {			  
+			alert('Select Age, State and District');
+		  }			  
+		});
+		
+	}); 
+	
+	function LoadState() {
+		$.ajax({   
+			url: 'https://cdn-api.co-vin.in/api/v2/admin/location/states',                
+			type: 'GET',               
+			dataType: 'json',               
+			success: function(data, textStatus, xhr) {                   
+				//console.log(data);   
+				$("#ddlState").html('');
+				stateid=0;
+				$("#ddlState").append($("<option></option>").val(0).html('Select State'));  
+					$.each( data.states, function( key, state ) {					
+					 $("#ddlState").append($("<option></option>").val(state.state_id).html(state.state_name));  
+				});	
+			},   
+			error: function(xhr, textStatus, errorThrown) {                   
+			}   
+		}); 
+	}
+	function LoadDistrict()
+	{
+		if(stateid>0){
+			$.ajax({   
+			url: 'https://cdn-api.co-vin.in/api/v2/admin/location/districts/'+stateid,                
+			type: 'GET',               
+			dataType: 'json',               
+			success: function(data, textStatus, xhr) {                   
+				//console.log(data); 	  
+				$("#ddlDistrict").html('');
+				Districtid=0;
+				$("#ddlDistrict").append($("<option></option>").val(0).html('Select District'));  
+					$.each( data.districts, function( key, districts ) {					
+					 $("#ddlDistrict").append($("<option></option>").val(districts.district_id).html(districts.district_name));  
+				});			  
+			},   
+			error: function(xhr, textStatus, errorThrown) {                   
+			}   
+			});
+		}
+	}	
+	function getslots(){
+		$("#divMain").html('');	
+		if(Districtid>0 && alertSet==1)
+		{
+			$.ajax({  
+				url: 'https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/findByDistrict?district_id='+Districtid+'&date='+todaydate,               
+				type: 'GET',              
+				dataType: 'json',              
+				success: function(data, textStatus, xhr) {                 
+					   
+					$('#spnlstUpdt').html('Last Updated: '+new Date());						
+					rownum=1;
+					var slotFound=0;
+					$.each( data.sessions, function( key, slots ) {					
+						if (slots.min_age_limit>=minage && (slots.vaccine == vaccine || vaccine=='ALL')) {							
+							$("#divMain").append('<div class="divcentres"> <h4>'+rownum+') '+slots.name+'</h4> <h5>Available Slot: '+slots.available_capacity+'</h5> <h5>Vaccine: '+slots.vaccine+'</h5> <h5>Date: '+slots.date+'</h5> </div>');
+							rownum++;
+							slotFound=1;
+						}
+					});	
+						if(slotFound==0)
+						{
+							$("#divMain").append('<div class="divNocentres"> <h4>No Slot Available</h4></div>');
+						}
+						else{
+							play();							
+						}
+				},  
+				error: function(xhr, textStatus, errorThrown) {                  
+				}  
+			});		
+		}
+		else{
+			$("#divMain").append('<div class="divNocentres"> <h4>Alert Not Set</h4></div>');
+		}
+	}
+	
+	function getslotsweek(){
+		$("#divMain").html('');	
+		if(Districtid>0 && alertSet==1)
+		{
+			$.ajax({  
+				url: 'https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id='+Districtid+'&date='+todaydate,               
+				type: 'GET',              
+				dataType: 'json',              
+				success: function(data, textStatus, xhr) {               
+					   
+					$('#spnlstUpdt').html('Last Updated: '+new Date());						
+					rownum=1;
+					var totalvaccine=0;
+					var slotFound=0;
+					$.each( data.centers, function( key, center ) {	
+						//console.log(center);					
+						var divtxttoappend='';
+						var slotadded=0;
+						divtxttoappend+='<div class="divcentres">';
+						
+						divtxttoappend+=' <h4>'+rownum+') '+center.name+'</h4>';
+						
+						$.each(center.sessions, function( key, slots ) {		
+						console.log(slots);							
+						if (slots.min_age_limit>=minage && (slots.vaccine == vaccine || vaccine=='ALL') && slots.available_capacity!=0) {	
+							divtxttoappend+='<hr><h5>Available Slot: '+slots.available_capacity+'</h5> <h5>Vaccine: '+slots.vaccine+'</h5> <h5>Date: '+slots.date+'</h5>';							
+							totalvaccine=totalvaccine+slots.available_capacity;
+							slotadded=1;
+							
+						}
+						
+					});	
+						
+						divtxttoappend+='</div>';
+						if(slotadded==1)
+						{	rownum++;
+							slotFound=1;
+							$("#divMain").append(divtxttoappend);
+							$('#spnlstUpdt').html('Last Updated: '+new Date() +'&nbsp;&nbsp;<span style="color:white; background-color: red;"> Total Center: '+rownum+'&nbsp;&nbsp;Total Vaccine: '+totalvaccine);
+						}
+						
+					});	
+					
+					if(slotFound==0)
+					{
+						$("#divMain").append('<div class="divNocentres"> <h4>No Slot Available</h4></div>');
+					}
+					else{
+						play();							
+					}
+				},  
+				error: function(xhr, textStatus, errorThrown) {                  
+				}  
+			});		
+		}
+		else{
+			$("#divMain").append('<div class="divNocentres"> <h4>Alert Not Set</h4></div>');
+		}
+	}
+	
+	function play() {
+            var audio = new Audio('https://media.geeksforgeeks.org/wp-content/uploads/20190531135120/beep.mp3');
+            audio.play();
+        }	
+
+
+</script>
+<style>
+.divcentres{
+ background-color: #9fdfbf;
+  color: black;
+  border: 2px solid black;
+  margin-top: 20px;
+  padding-left: 10px;
+}
+
+.divNocentres{
+ background-color: red;
+  color: white;
+  border: 2px solid white;
+  margin-top: 20px;
+  padding-left: 10px;
+}
+</style>
+</head>
+<body>
+<h1 id="hagegroup"> Covid Slot Update for Above 45 </h1>
+<h3 id="spnlstUpdt">Last Updated: </h3>
+<div>
+Min Age: 
+<select id="ddlMinAge">
+	<option value="18">18</option>
+	<option value="45">45</option>
+</select>
+&nbsp;Select State: <select id="ddlState"></select> 
+&nbsp;Select District: <select id="ddlDistrict"></select>  
+&nbsp; Vaccine: 
+<select id="ddlVaccine">
+	<option value="ALL">ALL</option>
+	<option value="COVISHIELD">COVISHIELD</option>
+	<option value="COVAXIN">COVAXIN</option>
+</select>
+&nbsp;<button id="btnsetalert"> Set Alert </button>  </div>
+<div id="divMain">
+	<div class="divcentres">
+		<h4>1) Chacha Nehru Bal Chikitsalaya</h4>
+		<h5>Available Slot: 200</h5>
+		<h5>Vaccine: 200</h5>
+		<h5>Date: 200</h5>
+	</div>
+</div>
+<input type="hidden" value"NS8DJkKsJVYZ8aj/VJB3mwtrZC3cjsh1+s4E/4mpWniRbXZYECwh1Yvuee0COpcn4dHBwefTgkhTwnrRDmN4SywZJp0J6lZVx/Y7w1ya1F+uTFKU+//Z3JtdnEp/Y8FcMBAphJQODiZx5OMIdvrQe9N1mpvsoQKb+EIcEYL0JK6r7zcDPUvtH2+naGK3CvX7QyrPhyTeIvf3K0YsSJi1lsLXM8bUIlzQWgcKBK6RqbMnhayHitM9ju971aKKKDrV" />
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
